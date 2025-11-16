@@ -1,0 +1,37 @@
+# ---- 共通 ----
+*.log
+*.tmp
+*.user
+*.suo
+*.cache
+
+# ---- .NET / Visual Studio / Rider ----
+bin/
+obj/
+[Bb]uild/
+[Ll]og/
+*.userprefs
+*.rsuser
+.vs/
+
+# Rider
+.idea/
+
+# 発行物
+**/publish/
+**/Release/
+**/Debug/
+
+# ---- Node / Vue / Frontend ----
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# npm / yarn / pnpm ロックファイル（必要なら1つだけ残すでもOK）
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# ---- VS Code 設定（共有したければコメントアウト）----
+# .vscode/
