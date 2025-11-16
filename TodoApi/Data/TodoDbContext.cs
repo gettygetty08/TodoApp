@@ -8,7 +8,7 @@ public class TodoDbContext : DbContext
     public TodoDbContext(DbContextOptions<TodoDbContext> options)
         : base(options)
     {
-        
+
     }
     public DbSet<Todo> Todos { get; set; } = default;
 
@@ -17,7 +17,7 @@ public class TodoDbContext : DbContext
         base.OnModelCreating(modelBuilder);
 
         var entity = modelBuilder.Entity<Todo>();
-        entity.ToTable("todos",schema: "public");
+        entity.ToTable("todos", schema: "public");
         entity.HasKey(t => t.Id);
         entity.Property(t => t.Id).HasColumnName("id");
 
@@ -31,16 +31,19 @@ public class TodoDbContext : DbContext
               .IsRequired();
 
         entity.Property(t => t.DueDate)
-              .HasColumnName("due_date");
+              .HasColumnName("due_date")
+              .HasColumnType("timestamp with time zone");
 
         entity.Property(t => t.CreatedAt)
               .HasColumnName("created_at")
+              .HasColumnType("timestamp with time zone")
               .IsRequired();
 
         entity.Property(t => t.UpdatedAt)
               .HasColumnName("updated_at")
+              .HasColumnType("timestamp with time zone")
               .IsRequired();
-        
+
     }
 
 

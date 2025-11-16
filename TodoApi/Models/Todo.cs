@@ -7,9 +7,9 @@ public class Todo
     public string? Description { get; set; }
 
     public bool IsDone { get; set; }
-    public DateTimeOffset? DueDate { get; set; }
-    public DateTimeOffset CreatedAt { get; set; }
-    public DateTimeOffset UpdatedAt { get; set; }
+    public DateTime? DueDate { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
     
 }
 
