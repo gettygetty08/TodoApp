@@ -1,4 +1,15 @@
+using Microsoft.EntityFrameworkCore;
+using TodoApi.Data;
+
 var builder = WebApplication.CreateBuilder(args);
+
+
+// PostgreSQL の接続文字列を取得
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+
+// DbContext をDIに登録
+builder.Services.AddDbContext<TodoDbContext>(options =>
+    options.UseNpgsql(connectionString));
 
 // Add services to the container.
 
