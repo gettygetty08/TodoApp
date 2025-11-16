@@ -28,6 +28,16 @@ dist/
 dist-ssr/
 *.local
 
+# ---- Vue / Vite env files (local secrets) ----
+**/.env.local
+**/.env.*.local
+
+# テストカバレッジ
+coverage/
+
+# Vite キャッシュ（使うなら）
+.vite/
+
 # npm / yarn / pnpm ロックファイル（必要なら1つだけ残すでもOK）
 # package-lock.json
 # yarn.lock
