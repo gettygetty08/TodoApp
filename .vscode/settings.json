@@ -1,0 +1,17 @@
+{
+  // 保存時に自動フォーマット
+  "editor.formatOnSave": true,
+
+  // Prettier をデフォのフォーマッタに
+  "[javascript]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[typescript]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[vue]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+
+  // Volar を Vue の言語サーバに
+  "vue.server.hybridMode": true,
+
+  // C# の using 自動整理など（好みで調整）
+  "[csharp]": {
+    "editor.formatOnSave": true
+  }
+}
