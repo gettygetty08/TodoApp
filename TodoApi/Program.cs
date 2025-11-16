@@ -3,6 +3,20 @@ using TodoApi.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
+//CORSポリシー名
+var MyAllowSpecificOrigins = "_myAllowSpecificOrigins";
+
+// 1. CORS をサービスに登録
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(name: MyAllowSpecificOrigins, policy =>
+    {
+        policy
+        .WithOrigins("http://localhost:5173")
+        .AllowAnyHeader()
+        .AllowAnyMethod();
+    });
+});
 
 // PostgreSQL の接続文字列を取得
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
@@ -28,6 +42,9 @@ if (app.Environment.IsDevelopment())
 }
 
 //app.UseHttpsRedirection();
+
+// 2. CORS をミドルウェアで有効にする
+app.UseCors(MyAllowSpecificOrigins);
 
 app.UseAuthorization();
 
