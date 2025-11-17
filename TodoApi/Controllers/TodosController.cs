@@ -36,7 +36,7 @@ public class TodosController : Controller
     {
         // GET: api/Todos
         var todos = await _repository.GetAllAsync();
-        return Ok(todos);
+        return Ok(todos.ToDtoList());
     }
 
     // GET: api/Todos/5
