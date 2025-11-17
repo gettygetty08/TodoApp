@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TodoApi.Data;
+using TodoApi.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,6 +25,8 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 // DbContext をDIに登録
 builder.Services.AddDbContext<TodoDbContext>(options =>
     options.UseNpgsql(connectionString));
+
+builder.Services.AddScoped<ITodoRepository, TodoRepository>();
 
 // Add services to the container.
 

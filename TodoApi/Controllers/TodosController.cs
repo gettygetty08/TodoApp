@@ -1,7 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TodoApi.Data;
+using TodoApi.Dtos;
+using TodoApi.Mappings;
 using TodoApi.Models;
+using TodoApi.Repositories;
 
 namespace TodoApi.Controllers;
 
@@ -9,11 +12,11 @@ namespace TodoApi.Controllers;
 [Route("api/[controller]")]
 public class TodosController : Controller
 {
-    private readonly TodoDbContext _context;
+    private readonly ITodoRepository _repository;
 
-    public TodosController(TodoDbContext context)
+    public TodosController(ITodoRepository repository)
     {
-        _context = context;
+        _repository = repository;
     }
 
     private static DateTime ToUtc(DateTime dt)
@@ -22,109 +25,91 @@ public class TodosController : Controller
         {
             DateTimeKind.Utc => dt,
             DateTimeKind.Local => dt.ToUniversalTime(),
-            DateTimeKind.Unspecified => DateTime.SpecifyKind(dt,DateTimeKind.Utc),
+            DateTimeKind.Unspecified => DateTime.SpecifyKind(dt, DateTimeKind.Utc),
             _ => dt
         };
     }
 
     // GET: api/Todos
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<Todo>>> GetTodos()
+    public async Task<ActionResult<IEnumerable<TodoDto>>> GetTodos()
     {
         // GET: api/Todos
-        var todos = await _context.Todos
-            .AsNoTracking()
-            .OrderBy(t => t.Id)
-            .ToListAsync();
-
+        var todos = await _repository.GetAllAsync();
         return Ok(todos);
     }
 
     // GET: api/Todos/5
     [HttpGet("{id:long}")]
-    public async Task<ActionResult<Todo>> GetTodo(long id)
+    public async Task<ActionResult<TodoDto>> GetTodo(long id)
     {
-        var todo = await _context.Todos
-            .AsNoTracking()
-            .FirstOrDefaultAsync(t => t.Id == id);
-
+        var todo = await _repository.GetByIdAsync(id);
         if (todo == null)
         {
             return NotFound();
         }
 
-        return Ok(todo);
+        return Ok(todo.ToDto());
     }
 
     // POST: api/Todos
     [HttpPost]
-    public async Task<ActionResult<Todo>> CreateTodo([FromBody] Todo todo)
+    public async Task<ActionResult<TodoDto>> CreateTodo([FromBody] TodoCreateRequest request)
     {
-        if (string.IsNullOrWhiteSpace(todo.Title))
+        if (!ModelState.IsValid)
         {
             // ここは本当はDTO＋ModelStateでやるべきだが、まずは最低限
-            return BadRequest("Title is required.");
+            return ValidationProblem(ModelState);
         }
 
-        // クライアントから来た Id / CreatedAt / UpdatedAt は信用しない
-        todo.Id = 0;
-        var now = DateTime.UtcNow;
-        todo.CreatedAt = now;
-        todo.UpdatedAt = now;
-
-        if (todo.DueDate.HasValue)
+        if (request.DueDate.HasValue)
         {
-            todo.DueDate = ToUtc(todo.DueDate.Value);
+            request.DueDate = ToUtc(request.DueDate.Value);
         }
 
-        _context.Todos.Add(todo);
-        await _context.SaveChangesAsync();
+        var entity = request.ToEntity();
+        var created = await _repository.AddAsync(entity);
+        var dto = created.ToDto();
+
         // REST的には 201 + Location が正解
-        return CreatedAtAction(nameof(GetTodo), new { id = todo.Id }, todo);
+        return CreatedAtAction(
+            nameof(GetTodo),
+            new { id = dto.Id },
+            dto
+        );
     }
 
     [HttpPut("{id:long}")]
-    public async Task<ActionResult<Todo>> UpdateTodo(long id, [FromBody] Todo todo)
+    public async Task<ActionResult<TodoDto>> UpdateTodo(long id, [FromBody] TodoUpdateRequest request)
     {
-        if (id != todo.Id)
+        if (!ModelState.IsValid)
         {
-            return BadRequest("Route id and body id do not match.");
+            return ValidationProblem(ModelState);
         }
 
-        var existing = await _context.Todos.FindAsync(id);
+        var updated = await _repository.UpdateAsync(id, entity =>
+        {
+            request.UpdateEntity(entity);
+        });
 
-        if (existing == null)
+        if (updated == null)
         {
             return NotFound();
         }
 
-        if (string.IsNullOrWhiteSpace(todo.Title))
-        {
-            return BadRequest("Title is required.");
-        }
 
-        existing.Title = todo.Title;
-        existing.Description = todo.Description;
-        existing.IsDone = todo.IsDone;
-        existing.DueDate = todo.DueDate;
-        existing.UpdatedAt = DateTime.UtcNow;
-
-        await _context.SaveChangesAsync();
-
-        return Ok(existing);
+        return Ok(updated.ToDto());
     }
 
     [HttpDelete("{id:long}")]
     public async Task<IActionResult> DeleteTodo(long id)
     {
-        var existing = await _context.Todos.FindAsync(id);
-        if (existing == null)
+        var deleted = await _repository.DeleteAsync(id);
+
+        if (!deleted)
         {
             return NotFound();
         }
-
-        _context.Todos.Remove(existing);
-        await _context.SaveChangesAsync();
 
         return NoContent();
     }
