@@ -1,33 +1,35 @@
 <script setup lang="ts">
 const appTitle = 'Todo フロント（仮）'
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL
-import axios from 'axios'
 import { ref, onMounted } from 'vue'
+import {
+  fetchTodos,
+  createTodo as apiCreateTodo,
+  updateTodo as apiUpdateTodo,
+  deleteTodo as apiDeleteTodo,
+  type TodoDto,
+  type TodoCreateRequest,
+  type TodoUpdateRequest,
+} from './api/todoClient'
+// import { isDotDotDotToken } from 'typescript'
 
-interface Todo {
-  id: number
-  title: string
-  description: string | null
-  isDone: boolean
-  dueDate: string | null
-  createdAt: string
-  updatedAt: string
-}
-
-const todos = ref<Todo[]>([])
+const todos = ref<TodoDto[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
 
-onMounted(async () => {
+const loadTodos = async () => {
   try {
-    const response = await axios.get<Todo[]>(`${apiBaseUrl}/api/Todos`)
-    todos.value = response.data
+    loading.value = true
+    error.value = null
+    todos.value = await fetchTodos()
   } catch (err: any) {
-    error.value = err.message ?? 'データ取得に失敗しました'
+    console.error(err)
+    error.value = err.message ?? 'Todo一覧の取得に失敗しました'
   } finally {
     loading.value = false
   }
-})
+}
+
+onMounted(loadTodos)
 
 const newTitle = ref<string>('')
 const newDescription = ref<string>('')
@@ -44,20 +46,16 @@ const createTodo = async () => {
     creating.value = true
     error.value = null
 
-    const payload = {
-      id: 0,
+    const payload: TodoCreateRequest = {
       title: newTitle.value,
       description: newDescription.value || null,
-      isDone: false,
       dueDate: null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
     }
 
-    const response = await axios.post<Todo>(`${apiBaseUrl}/api/Todos`, payload)
+    const created = await apiCreateTodo(payload)
 
     // 末尾に追加
-    todos.value.push(response.data)
+    todos.value.push(created)
 
     // フォームリセット
     newTitle.value = ''
@@ -71,22 +69,24 @@ const createTodo = async () => {
 }
 
 const updatingIds = ref<Set<number>>(new Set())
-const toggleDone = async (todo: Todo) => {
+const toggleDone = async (todo: TodoDto) => {
   try {
     updatingIds.value.add(todo.id)
     error.value = null
 
-    const payload: Todo = {
-      ...todo,
-      updatedAt: new Date().toISOString(),
+    const payload: TodoUpdateRequest = {
+      title: todo.title,
+      description: todo.description,
+      isDone: !todo.isDone, // ここで反転
+      dueDate: todo.dueDate,
     }
 
-    const response = await axios.put<Todo>(`${apiBaseUrl}/api/Todos/${todo.id}`, payload)
+    const updated = await apiUpdateTodo(todo.id, payload)
 
     // レスポンスで配列を更新
     const index = todos.value.findIndex((t) => t.id === todo.id)
     if (index !== -1) {
-      todos.value[index] = response.data
+      todos.value[index] = updated
     }
   } catch (err: any) {
     console.error(err)
@@ -98,7 +98,7 @@ const toggleDone = async (todo: Todo) => {
 
 const deletingIds = ref<Set<number>>(new Set())
 
-const deleteTodo = async (todo: Todo) => {
+const deleteTodo = async (todo: TodoDto) => {
   if (!confirm(`「${todo.title}」を削除します。よろしいですか？`)) {
     return
   }
@@ -107,7 +107,7 @@ const deleteTodo = async (todo: Todo) => {
     deletingIds.value.add(todo.id)
     error.value = null
 
-    await axios.delete(`${apiBaseUrl}/api/Todos/${todo.id}`)
+    await apiDeleteTodo(todo.id)
     // ローカル一覧から除外
     todos.value = todos.value.filter((t) => t.id !== todo.id)
   } catch (err: any) {
@@ -118,7 +118,7 @@ const deleteTodo = async (todo: Todo) => {
   }
 }
 
-const todoCopy = (todo: Todo, checkbox: HTMLInputElement): Todo => {
+const todoCopy = (todo: TodoDto, checkbox: HTMLInputElement): TodoDto => {
   return {
     ...todo,
     isDone: checkbox.checked,
@@ -160,7 +160,7 @@ const todoCopy = (todo: Todo, checkbox: HTMLInputElement): Todo => {
               type="checkbox"
               :checked="todo.isDone"
               :disabled="updatingIds.has(todo.id)"
-              @change="toggleDone(todoCopy(todo, $event.target as HTMLInputElement))"
+              @change="toggleDone(todo)"
             />
             <span :class="{ done: todo.isDone }">
               {{ todo.title }}
