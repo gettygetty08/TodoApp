@@ -46,7 +46,7 @@ public class TodosController : Controller
         var todo = await _repository.GetByIdAsync(id);
         if (todo == null)
         {
-            return NotFound();
+            return NotFoundTodo(id);
         }
 
         return Ok(todo.ToDto());
@@ -56,11 +56,12 @@ public class TodosController : Controller
     [HttpPost]
     public async Task<ActionResult<TodoDto>> CreateTodo([FromBody] TodoCreateRequest request)
     {
-        if (!ModelState.IsValid)
-        {
-            // ここは本当はDTO＋ModelStateでやるべきだが、まずは最低限
-            return ValidationProblem(ModelState);
-        }
+        // ModelState判定は不要（ApiControllerがやる）
+        // if (!ModelState.IsValid)
+        // {
+        //     // ここは本当はDTO＋ModelStateでやるべきだが、まずは最低限
+        //     return ValidationProblem(ModelState);
+        // }
 
         if (request.DueDate.HasValue)
         {
@@ -82,10 +83,11 @@ public class TodosController : Controller
     [HttpPut("{id:long}")]
     public async Task<ActionResult<TodoDto>> UpdateTodo(long id, [FromBody] TodoUpdateRequest request)
     {
-        if (!ModelState.IsValid)
-        {
-            return ValidationProblem(ModelState);
-        }
+        // ModelState判定は不要（ApiControllerがやる）
+        // if (!ModelState.IsValid)
+        // {
+        //     return ValidationProblem(ModelState);
+        // }
 
         var updated = await _repository.UpdateAsync(id, entity =>
         {
@@ -94,7 +96,7 @@ public class TodosController : Controller
 
         if (updated == null)
         {
-            return NotFound();
+            return NotFoundTodo(id);
         }
 
 
@@ -108,10 +110,23 @@ public class TodosController : Controller
 
         if (!deleted)
         {
-            return NotFound();
+            return NotFoundTodo(id);
         }
 
         return NoContent();
+    }
+
+    private NotFoundObjectResult NotFoundTodo(long id)
+    {
+        var problem = new ProblemDetails
+        {
+            Status = StatusCodes.Status404NotFound,
+            Title = "Todo not found",
+            Type = "https://httpstatuses.com/404",
+            Detail = $"Todo with id {id} was not found."
+        };
+
+        return NotFound(problem);
     }
 
 }
