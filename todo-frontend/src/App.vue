@@ -9,21 +9,65 @@ import {
   type TodoDto,
   type TodoCreateRequest,
   type TodoUpdateRequest,
+  ApiError,
+  type ValidationProblemDetails,
 } from './api/todoClient'
 // import { isDotDotDotToken } from 'typescript'
 
 const todos = ref<TodoDto[]>([])
 const loading = ref(true)
-const error = ref<string | null>(null)
+
+//画面上部などに出す「全体メッセージ」
+const globalError = ref<string | null>(null)
+
+//フォーム用のエラー（フィールド -> メッセージ配列)
+const formErrors = ref<Record<string, string[]>>({})
+
+const handleApiError = (err: unknown, fieldScope: 'form' | 'global' = 'global') => {
+  if (!(err instanceof ApiError)) {
+    //想定外（コードバグやライブラリの例外など）
+    globalError.value = '不明なエラーが発生しました。'
+    console.error(err)
+    return
+  }
+
+  const status = err.status
+  const problem = err.problem
+
+  //まずフォーム側のエラーを一旦リセット
+  if (fieldScope === 'form') {
+    formErrors.value = {}
+  }
+
+  if (status === 400 && problem && 'errors' in problem && fieldScope === 'form') {
+    const vpd = problem as ValidationProblemDetails
+    formErrors.value = vpd.errors ?? {}
+    globalError.value = null
+    return
+  }
+
+  if (status === 404) {
+    globalError.value = problem?.detail ?? '対象のデータが見つかりませんでした。'
+    return
+  }
+
+  if (status && status >= 500) {
+    globalError.value = problem?.detail ?? 'サーバーでエラーが発生しました。'
+    return
+  }
+
+  // その他（401/403/409など）必要に応じて増やす
+  globalError.value = err.message || 'エラーが発生しました。'
+}
 
 const loadTodos = async () => {
   try {
     loading.value = true
-    error.value = null
+    globalError.value = null
     todos.value = await fetchTodos()
-  } catch (err: any) {
+  } catch (err) {
     console.error(err)
-    error.value = err.message ?? 'Todo一覧の取得に失敗しました'
+    handleApiError(err, 'global')
   } finally {
     loading.value = false
   }
@@ -38,13 +82,15 @@ const creating = ref(false)
 
 const createTodo = async () => {
   if (!newTitle.value.trim()) {
-    alert('タイトルは必須です。')
+    // ここはフロント側の簡易チェック（サーバにもRequiredはある）
+    formErrors.value = { Title: ['タイトルは必須です。'] }
     return
   }
 
   try {
     creating.value = true
-    error.value = null
+    globalError.value = null
+    formErrors.value = {}
 
     const payload: TodoCreateRequest = {
       title: newTitle.value,
@@ -60,9 +106,9 @@ const createTodo = async () => {
     // フォームリセット
     newTitle.value = ''
     newDescription.value = ''
-  } catch (err: any) {
+  } catch (err) {
     console.error(err)
-    error.value = err.message ?? 'Todoの登録に失敗しました'
+    handleApiError(err, 'form')
   } finally {
     creating.value = false
   }
@@ -72,7 +118,7 @@ const updatingIds = ref<Set<number>>(new Set())
 const toggleDone = async (todo: TodoDto) => {
   try {
     updatingIds.value.add(todo.id)
-    error.value = null
+    globalError.value = null
 
     const payload: TodoUpdateRequest = {
       title: todo.title,
@@ -88,9 +134,9 @@ const toggleDone = async (todo: TodoDto) => {
     if (index !== -1) {
       todos.value[index] = updated
     }
-  } catch (err: any) {
+  } catch (err) {
     console.error(err)
-    error.value = err.message ?? 'Todoの更新に失敗しました。'
+    handleApiError(err, 'global')
   } finally {
     updatingIds.value.delete(todo.id)
   }
@@ -105,29 +151,32 @@ const deleteTodo = async (todo: TodoDto) => {
 
   try {
     deletingIds.value.add(todo.id)
-    error.value = null
+    globalError.value = null
 
     await apiDeleteTodo(todo.id)
     // ローカル一覧から除外
     todos.value = todos.value.filter((t) => t.id !== todo.id)
-  } catch (err: any) {
+  } catch (err) {
     console.error(err)
-    error.value = err.message ?? 'Todoの削除に失敗しました'
+    handleApiError(err, 'global')
   } finally {
     deletingIds.value.delete(todo.id)
   }
 }
 
-const todoCopy = (todo: TodoDto, checkbox: HTMLInputElement): TodoDto => {
-  return {
-    ...todo,
-    isDone: checkbox.checked,
-  }
-}
+// const todoCopy = (todo: TodoDto, checkbox: HTMLInputElement): TodoDto => {
+//   return {
+//     ...todo,
+//     isDone: checkbox.checked,
+//   }
+// }
 </script>
 
 <template>
   <main class="app">
+    <p v-if="globalError" class="error global-error">
+      {{ globalError }}
+    </p>
     <h1>{{ appTitle }}</h1>
     <section class="create">
       <h2>新規Todo追加</h2>
@@ -136,6 +185,9 @@ const todoCopy = (todo: TodoDto, checkbox: HTMLInputElement): TodoDto => {
           タイトル
           <input v-model="newTitle" type="text" placeholder="やることを入力" />
         </label>
+        <ul v-if="formErrors.Title" class="field-error">
+          <li v-for="msg in formErrors.Title" :key="msg">{{ msg }}</li>
+        </ul>
       </div>
       <div class="form-row">
         <label>
@@ -143,7 +195,7 @@ const todoCopy = (todo: TodoDto, checkbox: HTMLInputElement): TodoDto => {
           <textarea v-model="newDescription" rows="2" placeholder="必要なら詳細を入力" />
         </label>
       </div>
-      <button :disabled="creating || !newTitle.trim()" @click="createTodo">
+      <button :disabled="creating" @click="createTodo">
         {{ creating ? '登録中...' : '追加' }}
       </button>
     </section>
@@ -151,9 +203,8 @@ const todoCopy = (todo: TodoDto, checkbox: HTMLInputElement): TodoDto => {
     <section class="list">
       <h2>Todo一覧</h2>
       <p v-if="loading">読み込み中...</p>
-      <p v-if="error" class="error">{{ error }}</p>
 
-      <ul v-if="!loading && !error">
+      <ul v-if="!loading && !globalError">
         <li v-for="todo in todos" :key="todo.id" class="todo-item">
           <label>
             <input
@@ -255,5 +306,16 @@ button.danger {
 }
 .error {
   color: red;
+}
+
+.global-error {
+  margin-bottom: 1rem;
+}
+
+.field-error {
+  margin: 0.25rem 0 0;
+  padding-left: 1.2rem;
+  color: #c00;
+  font-size: 0.9rem;
 }
 </style>

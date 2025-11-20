@@ -12,6 +12,33 @@ export interface TodoDto {
   updatedAt: string
 }
 
+export interface ProblemDetails{
+    type?: string
+    title?: string
+    status?: number
+    detail?: string
+    instance?: string
+     // その他のプロパティも来る可能性があるので緩めておく
+    [key: string]: any
+}
+
+export interface ValidationProblemDetails extends ProblemDetails{
+    errors: Record<string,string[]>
+}
+
+export class ApiError extends Error{
+    status?: number
+    problem?: ProblemDetails
+
+    constructor(message: string, status?: number, problem?: ProblemDetails){
+        super(message)
+        this.name = 'ApiError'
+        this.status = status
+        this.problem = problem
+    }
+
+}
+
 //新規登録時のカタチ（TodoCreateRequest）
 export interface TodoCreateRequest {
   title: string
@@ -31,6 +58,24 @@ export interface TodoUpdateRequest{
 const client = axios.create({
     baseURL: apiBaseUrl
 })
+
+//レスポンスエラーをApiErrorに変換
+client.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        //ネットワークエラーなど
+        if(!error.response){
+            return Promise.reject(new ApiError('ネットワークエラーが発生しました。'))
+        }
+
+        const status = error.response.status as number
+        const data = error.response.data as ProblemDetails | undefined
+
+        const message = (data && data.title) || (status ? `Request failed with status ${status}` : 'Request failed')
+
+        return Promise.reject(new ApiError(message,status,data))
+    }
+)
 
 export const fetchTodos = async(): Promise<TodoDto[]> => {
     const res = await client.get<TodoDto[]>('/api/Todos')
