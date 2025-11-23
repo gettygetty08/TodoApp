@@ -1,47 +1,46 @@
-name: Build & Test(.net + Vue)
+name: Build & Test (.NET + Vue)
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
 
     steps:
-      #ソース取得
-      - name: checkout
+      - name: Checkout
         uses: actions/checkout@v4
-      
-      # .NET セットアップ
+
       - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore & Build .NET
         run: |
           dotnet restore
-          sotnet build --no-restore --configuration Release
-      
-      #テスト実行
+          dotnet build --no-restore --configuration Release
+
       - name: Test .NET
         run: |
           dotnet test --no-build --configuration Release
-      
-      #Node セットアップ
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
           cache-dependency-path: |
             todo-frontend/package-lock.json
             todo-frontend/package.json
-      
-      #フロント依存関係インストール
+
       - name: Install frontend dependencies
         working-directory: todo-frontend
-        run: npm Install
-      
-      #フロントエンド
+        run: npm install
+
       - name: Build frontend
         working-directory: todo-frontend
         run: npm run build
