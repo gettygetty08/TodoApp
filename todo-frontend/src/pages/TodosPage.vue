@@ -1,26 +1,25 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { fetchTodos } from '@/api/todos'
-import type { TodoDto } from '../types/todo'
+import { useTodos } from '@/composables/useTodos'
+import TodoForm from '@/pages/TodoForm.vue'
+import type { TodoCreateRequest } from '@/types/todo'
 
-const todos = ref<TodoDto[]>([])
-const loading = ref(true)
-const error = ref<string | null>(null)
+const { todos, loading, error, loadTodos } = useTodos()
 
-onMounted(async () => {
-  try {
-    todos.value = await fetchTodos()
-  } catch {
-    error.value = '一覧取得に失敗しました'
-  } finally {
-    loading.value = false
-  }
-})
+const handleSubmit = async (payload: TodoCreateRequest) => {
+  await create(payload)   // ここはあとで useTodos に実装
+  await loadTodos()
+}
 </script>
 
 <template>
   <main>
     <h1>Todo 一覧</h1>
+
+    <TodoForm :pending="loading" @submit="handleSubmit"/>
+
+    <button type="button" @click="loadTodos" :disabled="loading">
+        再読込
+    </button>
     <p v-if="loading">読み込み中...</p>
     <p v-else-if="error">{{ error }}</p>
     <ul v-else>
